@@ -5,7 +5,7 @@ import matplotlib.pylab as plt
 import pandas as pd
 import numpy as np
 from tensorflow.contrib.learn.python.learn.estimators._sklearn import train_test_split
-from tensorflow.python.keras import Sequential
+from tensorflow.python.keras import Sequential, regularizers
 from tensorflow.python.keras.callbacks import ReduceLROnPlateau
 from tensorflow.python.keras.layers import Dense, Dropout, BatchNormalization, LeakyReLU, Activation
 from tensorflow.python.keras.optimizers import Nadam
@@ -76,17 +76,27 @@ X, Y = np.array(X), np.array(Y)
 
 X_train, X_test, Y_train, Y_test = create_Xt_Yt(X, Y)
 
-
-
-
 opt = Nadam(lr=0.001)
 
+
+
+
 model = Sequential()
-model.add(Dense(64, input_dim=30))
+
+model.add(Dense(64, input_dim=30, activity_regularizer=regularizers.l2(0.01)))
 model.add(BatchNormalization())
 model.add(LeakyReLU())
+
+model.add(Dropout(0.5))
+
+model.add(Dense(16, activity_regularizer=regularizers.l2(0.01)))
+model.add(BatchNormalization())
+model.add(LeakyReLU())
+
 model.add(Dense(2))
 model.add(Activation('softmax'))
+
+
 
 reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.9, patience=5, min_lr=0.000001, verbose=1)
 model.compile(optimizer=opt,
@@ -102,7 +112,6 @@ history = model.fit(X_train, Y_train,
           callbacks=[reduce_lr])
 
 plt.figure()
-
 plt.plot(history.history['loss'])
 plt.plot(history.history['val_loss'])
 plt.title('model loss')

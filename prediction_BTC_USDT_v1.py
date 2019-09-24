@@ -5,8 +5,8 @@ import matplotlib.pylab as plt
 import pandas as pd
 import numpy as np
 from tensorflow.contrib.learn.python.learn.estimators._sklearn import train_test_split
-from tensorflow.python.keras import Sequential
-from tensorflow.python.keras.callbacks import ReduceLROnPlateau
+from tensorflow.python.keras import Sequential, regularizers
+from tensorflow.python.keras.callbacks import ReduceLROnPlateau, ModelCheckpoint
 from tensorflow.python.keras.layers import Dense, Dropout, BatchNormalization, LeakyReLU, Activation
 from tensorflow.python.keras.optimizers import Nadam
 
@@ -35,14 +35,11 @@ def create_Xt_Yt(X, y, percentage=0.9):
 
     return X_train, X_test, Y_train, Y_test
 
-
-# data = pd.read_csv('AAPL.csv')[::-1]
-# data = data.ix[:, 'Adj Close'].tolist()
 data = pd.read_csv('Gemini_BTCUSD_d.csv')[::-1]
 data = data.ix[:, 'Close'].tolist()
-plt.plot(data)
-plt.isinteractive()
 
+# plt.plot(data)
+# plt.isinteractive()
 
 WINDOW = 30
 EMB_SIZE = 1
@@ -79,43 +76,66 @@ X_train, X_test, Y_train, Y_test = create_Xt_Yt(X, Y)
 
 
 
-opt = Nadam(lr=0.001)
-
 model = Sequential()
-model.add(Dense(64, input_dim=30))
+model.add(Dense(64, input_dim=30,
+                activity_regularizer=regularizers.l2(0.01)))
+model.add(BatchNormalization())
+model.add(LeakyReLU())
+
+model.add(Dropout(0.5))
+model.add(Dense(16,
+                activity_regularizer=regularizers.l2(0.01)))
 model.add(BatchNormalization())
 model.add(LeakyReLU())
 model.add(Dense(2))
 model.add(Activation('softmax'))
 
-reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.9, patience=5, min_lr=0.000001, verbose=1)
+opt = Nadam(lr=0.001)
+
+reduce_lr = ReduceLROnPlateau(monitor='val_acc', factor=0.9, patience=25, min_lr=0.000001, verbose=1)
+checkpointer = ModelCheckpoint(filepath="test.hdf5", verbose=1, save_best_only=True)
 model.compile(optimizer=opt,
               loss='categorical_crossentropy',
               metrics=['accuracy'])
 
+
+
+
 history = model.fit(X_train, Y_train,
-          nb_epoch = 500,
+          nb_epoch = 50,
           batch_size = 128,
           verbose=1,
           validation_data=(X_test, Y_test),
-          shuffle=True,
-          callbacks=[reduce_lr])
+          callbacks=[reduce_lr, checkpointer],
+          shuffle=True)
 
-plt.figure()
+pred = model.predict(Y_test)
+original = Y_test
+predicted = pred
 
-plt.plot(history.history['loss'])
-plt.plot(history.history['val_loss'])
-plt.title('model loss')
-plt.ylabel('loss')
-plt.xlabel('epoch')
-plt.legend(['train', 'test'], loc='best')
-
-
-plt.figure()
-plt.plot(history.history['acc'])
-plt.plot(history.history['val_acc'])
-plt.title('model accuracy')
-plt.ylabel('acc')
-plt.xlabel('epoch')
-plt.legend(['train', 'test'], loc='best')
+# plt.plot(original, color='black', label = 'Original data')
+plt.plot(predicted, color='blue', label = 'Predicted data')
+plt.legend(loc='best')
+plt.title('Actual and predicted')
 plt.show()
+
+#
+# plt.figure()
+# plt.plot(history.history['loss'])
+# plt.plot(history.history['val_loss'])
+# plt.title('model loss')
+# plt.ylabel('loss')
+# plt.xlabel('epoch')
+# plt.legend(['train', 'test'], loc='best')
+#
+#
+# plt.figure()
+# plt.plot(history.history['acc'])
+# plt.plot(history.history['val_acc'])
+# plt.title('model accuracy')
+# plt.ylabel('accuracy')
+# plt.xlabel('epoch')
+# plt.legend(['train', 'test'], loc='best')
+#
+#
+# plt.show()
